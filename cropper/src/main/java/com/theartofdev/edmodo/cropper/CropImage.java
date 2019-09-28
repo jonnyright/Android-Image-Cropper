@@ -81,6 +81,13 @@ public final class CropImage {
      */
     public static final String CROP_IMAGE_EXTRA_RESULT = "CROP_IMAGE_EXTRA_RESULT";
 
+
+    /**
+     * The key used to pass a flag if the {@link CropImageActivity} should request permission self
+     */
+
+    public static final String CROP_IMAGE_EXTRA__REQUEST_STORAGE_PERMISSIONS = "CROP_IMAGE_EXTRA__REQUEST_STORAGE_PERMISSIONS";
+
     /**
      * The request code used to start pick image activity to be used on result to identify the this
      * specific request.
@@ -282,10 +289,32 @@ public final class CropImage {
     public static List<Intent> getGalleryIntents(
             @NonNull PackageManager packageManager, String action, boolean includeDocuments) {
         List<Intent> intents = new ArrayList<>();
-        Intent pickPhoto = new Intent(Intent.ACTION_PICK,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        Intent pickPhoto = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         pickPhoto.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        Intent galleryIntent = action.equals(Intent.ACTION_GET_CONTENT) ? new Intent(action) : new Intent(action, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        galleryIntent.setType("image/*");
+        List<ResolveInfo> listGallery = packageManager.queryIntentActivities(galleryIntent, 0);
+        for (ResolveInfo res : listGallery) {
+            Intent intent = new Intent(galleryIntent);
+            intent.setComponent(new ComponentName(res.activityInfo.packageName, res.activityInfo.name));
+            intent.setPackage(res.activityInfo.packageName);
+            intents.add(intent);
+        }
+
+        intents.add(galleryIntent);
+        // remove documents intent
+        if (!includeDocuments) {
+            for (Intent intent : intents) {
+                if (intent.getComponent() != null && intent.getComponent() != null && intent.getComponent().getClassName().equals("com.android.documentsui.DocumentsActivity")) {
+                    intents.remove(intent);
+                    break;
+                }
+            }
+        }
+
         intents.add(pickPhoto);
+
         return intents;
     }
 
@@ -375,10 +404,10 @@ public final class CropImage {
      */
     public static boolean isReadExternalStoragePermissionsRequired(
             @NonNull Context context, @NonNull Uri uri) {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+        return (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED
-                && isUriRequiresPermissions(context, uri);
+                && isUriRequiresPermissions(context, uri));
     }
 
     /**
@@ -473,6 +502,13 @@ public final class CropImage {
          * Get {@link CropImageActivity} intent to start the activity.
          */
         public Intent getIntent(@NonNull Context context, @Nullable Class<?> cls) {
+            return getIntent(context, cls, true);
+        }
+
+        /**
+         * Get {@link CropImageActivity} intent to start the activity.
+         */
+        public Intent getIntent(@NonNull Context context, @Nullable Class<?> cls, boolean requestStoragePermissions) {
             mOptions.validate();
 
             Intent intent = new Intent();
@@ -480,6 +516,7 @@ public final class CropImage {
             Bundle bundle = new Bundle();
             bundle.putParcelable(CROP_IMAGE_EXTRA_SOURCE, mSource);
             bundle.putParcelable(CROP_IMAGE_EXTRA_OPTIONS, mOptions);
+            bundle.putBoolean(CROP_IMAGE_EXTRA__REQUEST_STORAGE_PERMISSIONS, requestStoragePermissions);
             intent.putExtra(CropImage.CROP_IMAGE_EXTRA_BUNDLE, bundle);
             return intent;
         }
@@ -511,6 +548,17 @@ public final class CropImage {
          */
         public void start(@NonNull Context context, @NonNull Fragment fragment) {
             fragment.startActivityForResult(getIntent(context), CROP_IMAGE_ACTIVITY_REQUEST_CODE);
+        }
+
+        /**
+         * Start {@link CropImageActivity}.
+         *
+         * @param fragment fragment to receive result
+         * @param requestStoragePermission to request permissions automatically if needed
+         */
+
+        public void start(@NonNull Context context, @NonNull Fragment fragment, boolean requestStoragePermission) {
+            fragment.startActivityForResult(getIntent(context, CropImageActivity.class, requestStoragePermission), CROP_IMAGE_ACTIVITY_REQUEST_CODE);
         }
 
         /**
