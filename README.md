@@ -18,7 +18,7 @@ Android Image Cropper
 
  ```
  dependencies {
-     api 'com.theartofdev.edmodo:android-image-cropper:2.8.+'
+     implementation 'com.github.jonnyright:Android-Image-Cropper:2.8.3'
  }
  ```
 
